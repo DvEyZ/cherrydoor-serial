@@ -70,7 +70,7 @@ impl SerialReceiveQueue {
             } else {
                 let buf_str = String::from_utf8(buf).unwrap();
 
-                if buf_str.starts_with("system initialized") {
+                if buf_str.starts_with("System initialized") {
                     self.request_profile().await;
 
                     continue;

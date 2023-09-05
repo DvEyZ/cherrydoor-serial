@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 async-std = "1.12.0"
 axum = { version = "0.6.19", features = ["macros"] }
-cherrydoor-command = { path = "../cherrydoor-command" }
+cherrydoor-command = { git = "https://github.com/DvEyZ/cherrydoor-command.git" }
 dotenv = "0.15.0"
 futures = "0.3.28"
 reqwest = { version = "0.11.20", features = ["json"] }
