@@ -1,0 +1,17 @@
+[package]
+name = "cherrydoor-serial"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-std = "1.12.0"
+axum = { version = "0.6.19", features = ["macros"] }
+cherrydoor-command = { path = "../cherrydoor-command" }
+dotenv = "0.15.0"
+futures = "0.3.28"
+reqwest = { version = "0.11.20", features = ["json"] }
+serde = { version = "1.0.188", features = ["derive"] }
+tokio = { version = "1.29.1", features = ["full"] }
+tokio-serial = "5.4.4"
