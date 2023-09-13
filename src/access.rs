@@ -49,7 +49,7 @@ impl AccessManager {
         }
     }
 
-    pub async fn request_profile(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn request_profile(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
         let client = reqwest::Client::new();
 
         let prof = client.get(format!("{}/active-profile", self.api_url))
@@ -70,7 +70,7 @@ impl AccessManager {
         }
     }
 
-    pub async fn access(&self, code :&str) -> Result<(), Box<dyn Error>> {
+    pub async fn access(&self, code :&str) -> Result<AccessStatus, Box<dyn Error + Send + Sync>> {
         let client = reqwest::Client::new();
 
         let res = client.post(format!("{}/access/code", self.api_url))
@@ -104,6 +104,6 @@ impl AccessManager {
 
         self.send.push_command(command).await?;
 
-        Ok(())
+        Ok(result)
     }
 }

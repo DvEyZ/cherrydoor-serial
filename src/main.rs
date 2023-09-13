@@ -11,11 +11,10 @@ use errors::ErrorReporter;
 use futures::{try_join, lock::Mutex};
 use serial_receive::SerialReceiveQueue;
 use serial_send::SerialSendQueue;
+use tokio_serial::SerialStream;
 #[allow(unused_imports)]
 use tokio_serial::{SerialPortBuilderExt, SerialPort};
 use tokio::io::{AsyncRead, AsyncWrite};
-use std::pin::Pin;
-
 
 #[derive(Clone)]
 pub struct AppState {
@@ -23,22 +22,39 @@ pub struct AppState {
     pub recv_queue :SerialReceiveQueue
 }
 
-#[cfg(not(debug_assertions))]
-fn get_io() -> (Box<dyn AsyncRead + Send + Sync>, Box<dyn AsyncWrite + Send + Sync>) {
+type Serial = (Arc<Mutex<dyn AsyncRead + Send + Sync + Unpin>>, Arc<Mutex<dyn AsyncWrite + Send + Sync + Unpin>>);
+
+trait AsyncReadWrite :AsyncRead + AsyncWrite {}
+impl AsyncReadWrite for SerialStream {}
+
+#[allow(unused)]
+fn get_io_release() -> Serial {
     let serial = std::env::var("SERIAL_PORT_PATH").unwrap();
     let baud_rate = std::env::var("SERIAL_PORT_BAUD_RATE").unwrap().parse::<u32>().unwrap();
 
-    let serial_port = Box::new(tokio_serial::new(serial, baud_rate)
+    let sp = tokio_serial::new(serial, baud_rate)
         .timeout(Duration::from_secs(5))
-    .open_native_async().unwrap());
+    .open_native_async().unwrap();
 
-    (serial_port, serial_port)
+    let asp = Arc::new(Mutex::new(Box::pin(sp)));
+
+    (asp.clone(), asp)
 }
 
+#[allow(unused)]
+fn get_io_debug() -> Serial {
+    (
+        Arc::new(Mutex::new(Box::pin(tokio::io::stdin()))), 
+        Arc::new(Mutex::new(Box::pin(tokio::io::stdout())))
+    )
+}
+
+fn get_io() -> Serial {
 #[cfg(debug_assertions)]
-fn get_io() -> (Pin<Box<dyn AsyncRead + Send + Sync>>, Pin<Box<dyn AsyncWrite + Send + Sync>>)  {
-    (Box::pin(tokio::io::stdin()), Box::pin(tokio::io::stdout()))
-}
+    return get_io_debug();
+#[cfg(not(debug_assertions))]
+    return get_io_release();    
+}   
 
 #[tokio::main]
 async fn main() {
@@ -47,12 +63,13 @@ async fn main() {
     let (input, output) = get_io();
     let api_url = std::env::var("API_URL").unwrap();
     let api_token = std::env::var("API_TOKEN").unwrap();
+    let log_file_name = std::env::var("LOG_FILE").unwrap();
 
-    let error_reporter = ErrorReporter::new();
-    let send_queue = SerialSendQueue::new(Arc::new(Mutex::new(output)));
+    let error_reporter = ErrorReporter::new(&log_file_name).await.unwrap();
+    let send_queue = SerialSendQueue::new(output);
     let access_manager = AccessManager::new(send_queue.clone(), api_url, api_token);
     let mut recv_queue = SerialReceiveQueue::new(
-        Arc::new(Mutex::new(input)), 
+        input, 
         error_reporter,
         access_manager
     );
@@ -69,7 +86,7 @@ async fn main() {
     .into_make_service();
     
     let recv_queue_task = tokio::task::spawn(async move {
-        recv_queue.run().await
+        recv_queue.run().await;
     });
 
     let server_task = tokio::task::spawn(async move {

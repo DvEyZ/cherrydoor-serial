@@ -1,4 +1,4 @@
-use std::{io::ErrorKind, sync::Arc, pin::Pin};
+use std::{io::ErrorKind, sync::Arc};
 
 use cherrydoor_command::Heartbeat;
 use futures::{lock::Mutex, StreamExt, SinkExt};
@@ -8,7 +8,7 @@ use crate::{errors::ErrorReporter, access::AccessManager};
 
 #[derive(Clone)]
 pub struct SerialReceiveQueue {
-    serial :Arc<Mutex<Pin<Box<dyn AsyncRead + Send + Sync>>>>,
+    serial :Arc<Mutex<dyn AsyncRead + Send + Sync + Unpin>>,
     error_reporter :ErrorReporter,
     access_manager :AccessManager,
     next_taken :Arc<Mutex<bool>>,
@@ -17,7 +17,7 @@ pub struct SerialReceiveQueue {
 }
 
 impl SerialReceiveQueue {
-    pub fn new(serial :Arc<Mutex<Pin<Box<dyn AsyncRead + Send + Sync>>>>, error_reporter :ErrorReporter, access_manager :AccessManager) -> Self {
+    pub fn new(serial :Arc<Mutex<dyn AsyncRead + Send + Sync + Unpin>>, error_reporter :ErrorReporter, access_manager :AccessManager) -> Self {
         let (cx, rx) = mpsc::channel(8);
 
         Self {
@@ -29,14 +29,21 @@ impl SerialReceiveQueue {
     }
 
     async fn request_profile(&self) {
+        #[allow(unused_variables)]
         if let Err(e) = self.access_manager.request_profile().await {
 
         }
     }
 
     async fn access(&self, code :&str) {
-        if let Err(e) = self.access_manager.access(code).await {
-            
+        match self.access_manager.access(code).await {
+            Ok(status) => {
+                self.error_reporter.report_access(String::from(code), status).await;
+            }
+            #[allow(unused_variables)]
+            Err(e) => {
+                
+            }
         };
     }
 

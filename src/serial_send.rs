@@ -1,4 +1,4 @@
-use std::{sync::Arc, error::Error, pin::Pin};
+use std::{sync::Arc, error::Error};
 
 use cherrydoor_command::Command;
 use futures::lock::Mutex;
@@ -6,18 +6,18 @@ use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 #[derive(Clone)]
 pub struct SerialSendQueue {
-    serial :Arc<Mutex<Pin<Box<dyn AsyncWrite + Send + Sync>>>>,
+    serial :Arc<Mutex<dyn AsyncWrite + Send + Sync + Unpin>>,
 }
 
 impl SerialSendQueue {
-    pub fn new(serial :Arc<Mutex<Pin<Box<dyn AsyncWrite + Send + Sync>>>>) -> Self {
+    pub fn new(serial :Arc<Mutex<dyn AsyncWrite + Send + Sync + Unpin>>) -> Self {
         Self { 
             serial
         }
     }
 
 
-    pub async fn push_command(&self, command :Command) -> Result<(), Box<dyn Error>>{
+    pub async fn push_command(&self, command :Command) -> Result<(), Box<dyn Error + Send + Sync>>{
         let mut serial = self.serial.lock().await;
         let cmd = command.into_string()?;
 
